@@ -23,8 +23,8 @@ def main(outpipe):
 	macports_daemons = [daemon.replace(".plist", "") for daemon in ls if daemon.find("org.macports") == 0]
 	running_daemons = [mpdaemon for mpdaemon in get_running_daemons() if "org.macports" in mpdaemon]
 	for daemon in macports_daemons:
-		daemon = daemon + " "*(60-len(daemon))
-		outpipe.write(daemon)
+		outs = daemon + " "*(60-len(daemon))
+		outpipe.write(outs)
 		if daemon in running_daemons:
 			col = COL_GRN
 			status = "RUNNING"
