@@ -1,45 +1,76 @@
 #!/usr/bin/python
-
-import os, sys, subprocess
-
-#Launch Daemons directory for OS X
-DAEMONS_DIR = "/Library/LaunchDaemons/"
+import sys
+import osxdaemons
 
 COL_RED = "\033[91m"
 COL_GRN = "\033[92m"
 COL_END = "\033[0m"
 
-def get_running_daemons():
-	lctl = subprocess.Popen(["/bin/launchctl", "list"], stdout=subprocess.PIPE)
-	daemons = lctl.stdout.readlines()
-	daemons = [line.split("\t") for line in daemons]
-	daemons = [line[2].strip() for line in daemons[1:]]
-	return daemons
+load_actions = ["up", "on", "load", "start"] 
+unload_actions = ["down", "off", "unload", "stop"]
 
-def usage(outpipe):
+ACTIONS = {act:"load"  for act in load_actions}
+ACTIONS.update({act:"unload" for act in unload_actions})
+
+def usage():
 	sname = str(sys.argv[0])
-	outpipe.write("Lists or starts/stops macports related services.\n")
-	outpipe.write("Usage: ./" + sname + " [<service name> <up/down>] \n")
+	print("Lists or starts/stops macports related services.")
+	print("Usage: ./" + sname + " [<service name> <verb>] ")
+	print("Valid verbs: ")
 	
-def print_services(outpipe, macports_daemons):
-	running_daemons = [mpdaemon for mpdaemon in get_running_daemons() if "org.macports" in mpdaemon]
-	for daemon in macports_daemons:
+
+def match_service(sname):
+	matches = [daemon for daemon in osxdaemons.get_all_daemons() if sname in daemon]
+	if len(matches) > 1:
+		print("Matched too many services:\n")
+		for match in matches:
+			print("> " + match + "\n")
+		return None
+	#print("Found service: " + matches[0] + "\n")
+	return matches[0]
+
+def match_action(action):
+	if action in ACTIONS:
+		action = ACTIONS[action]
+		return action
+	else:
+		return None
+
+
+def service_action(service, action):
+	action = match_action(action)
+	if action:
+		print(action.title() + "ing service: " + service)
+		return osxdaemons.do(service, action)
+	else:
+		print("Wtf I don't know how to " + action + ".")
+		usage()
+		return -1
+
+	
+def print_services():
+	running_daemons = osxdaemons.get_running_daemons()
+	for daemon in osxdaemons.get_all_daemons():
+		outs = daemon + " "*(60-len(daemon))
 		if daemon in running_daemons:
 			col = COL_GRN
 			status = "RUNNING"
 		else:
 			col = COL_RED
 			status = "NOT RUNNING"
-		outpipe.write(col + status + COL_END + "\n")
+		print(outs + col + status + COL_END)
 
-def main(outpipe):
-	ls = os.listdir(DAEMONS_DIR)
-
-	macports_daemons = [daemon.replace(".plist", "") for daemon in ls if "org.macports." in daemon]
+def main():
 	if len(sys.argv) == 1:
-		print_services(outpipe, macports_daemons)
+		print_services()
+		return 0
+	elif len(sys.argv) == 3:
+		sname, action = sys.argv[1:3]
+		sname = match_service(sname)
+		return service_action(sname, action)
 	else:
-		usage(outpipe)
+		usage()
+		return 0
 
 if __name__ == "__main__":
-	main(sys.stdout)
+	sys.exit(main())
